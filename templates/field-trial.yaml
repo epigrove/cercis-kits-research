@@ -88,7 +88,7 @@ tables:
       - { name: event_id, label_cn: 事件编号, label_en: Event ID, type: text, required: true }
       - { name: study_id, label_cn: 所属研究, label_en: Study, type: text, required: true, reference: studies.study_id }
       - { name: date, label_cn: 日期, label_en: Date, type: date, required: true }
-      - { name: stage, label_cn: 生育期, label_en: Stage, type: text, allowed_values: "播种;出苗;分蘖;拔节;抽穗;开花;灌浆;成熟;收获;其他" }
+      - { name: stage, label_cn: 生育期, label_en: Stage, type: text, allowed_values: "播种;出苗;分蘖期;拔节期;抽穗期;开花期;灌浆期;成熟期;收获;其他" }
       - { name: event_type, label_cn: 类型, label_en: Type, type: text, allowed_values: "田间操作;取样;测产;观测;其他" }
       - { name: title, label_cn: 名称, label_en: Title, type: text }
       - { name: operator, label_cn: 操作人, label_en: Operator, type: text }

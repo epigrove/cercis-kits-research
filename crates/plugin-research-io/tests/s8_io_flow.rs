@@ -132,7 +132,7 @@ fn s8_import_codebook_and_exports() {
         &events,
         "event_id,study_id,date,stage,event_type,title,operator,notes\n\
          EV-001,ST-2026-001,2026-06-01,播种,田间操作,播种,测定员1,\n\
-         EV-002,ST-2026-001,2026-06-15,分蘖,取样,取样,测定员2,\n",
+         EV-002,ST-2026-001,2026-06-15,分蘖期,取样,取样,测定员2,\n",
     )
     .unwrap();
     let samples = dir.join("samples.csv");
