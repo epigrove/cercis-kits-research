@@ -22,6 +22,9 @@ struct Fail {
 
 type R<T> = std::result::Result<T, Fail>;
 
+/// 本插件在项目里的 ID（登记台账里记的就是它）。
+const PLUGIN_ID: &str = "research_template";
+
 fn fail<T>(message: impl Into<String>, hint: impl Into<String>) -> R<T> {
     Err(Fail {
         message: message.into(),
@@ -326,6 +329,8 @@ fn run(cli: &Cli, data: &Path) -> R<Value> {
                 project.display().to_string(),
                 "--file".into(),
                 template_file.display().to_string(),
+                "--plugin".into(),
+                PLUGIN_ID.into(),
             ])?;
 
             let mut terms_profile = Value::Null;
@@ -345,6 +350,8 @@ fn run(cli: &Cli, data: &Path) -> R<Value> {
                     project.display().to_string(),
                     "--file".into(),
                     pack_file.display().to_string(),
+                    "--plugin".into(),
+                    PLUGIN_ID.into(),
                 ])?;
                 terms_profile = t.get("profile").cloned().unwrap_or(Value::Null);
             }
@@ -387,6 +394,8 @@ fn run(cli: &Cli, data: &Path) -> R<Value> {
                 project.display().to_string(),
                 "--file".into(),
                 pack_file.display().to_string(),
+                "--plugin".into(),
+                PLUGIN_ID.into(),
             ])?;
             if let Some(map) = out.as_object_mut() {
                 map.insert("action".into(), json!("research.terms"));

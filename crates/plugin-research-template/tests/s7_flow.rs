@@ -171,8 +171,8 @@ fn research_template_and_term_packs() {
 
     // 3. 写一行数据（研究 → 小区），让"数据表"真的非空
     for (table, sets) in [
-        ("studies", vec!["study_id=ST-001", "name=合成试验"]),
-        ("units", vec!["unit_id=U-001", "study_id=ST-001", "block=B1"]),
+        ("studies", vec!["study_id=ST-2026-001", "name=合成试验"]),
+        ("units", vec!["unit_id=U-001", "study_id=ST-2026-001", "block=B1"]),
     ] {
         let mut args = vec![
             "append".into(),

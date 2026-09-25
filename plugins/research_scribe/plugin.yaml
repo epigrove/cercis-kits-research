@@ -4,6 +4,7 @@
 # 插件自己不联网、不内置某家 SDK；入库一律走内核 append-many（一次事务、一条流水）。
 # 确认前只写项目里的 _labnote/scribe/<会话>/，主表一个字节都不动。
 id: research_scribe
+namespace: research   # 扩展点键前缀（D40）：本插件的界面扩展点都写在 `research.` 下面
 name: Field Scribe
 label_cn: 田间录入员
 version: 0.1.0
@@ -15,6 +16,9 @@ permissions:
   write: true      # 会话目录 + 确认后入库（入库走内核通道）
   network: false   # 插件本身不联网；要联网由用户给的模型命令决定
 
+# 声明式前置条件（D38）：录入员要有地方写
+requires:
+  tables: [observations]
 surfaces:
   desktop_gui: true
   desktop_cli: true

@@ -4,6 +4,7 @@
 # 读用 query/template；插件自己不碰 tables/*.csv。
 # 类型与校验规则来自内核（value-types / infer-types），插件不自己写判断。
 id: research_io
+namespace: research   # 扩展点键前缀（D40）：本插件的界面扩展点都写在 `research.` 下面
 name: Research IO
 label_cn: 科研导入导出
 version: 0.1.0
@@ -15,6 +16,9 @@ permissions:
   write: true      # 导入会写数据（走内核通道，留痕）
   network: false
 
+# 声明式前置条件（D38）：项目满足这些条件才"生效"；不满足时内核会说明缺什么
+requires:
+  tables: [observations, samples]   # 导入导出的目标表
 surfaces:
   desktop_gui: true
   desktop_cli: true

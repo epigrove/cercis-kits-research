@@ -3,6 +3,7 @@
 # 它只做"选择与调用"：真正写项目的是内核通道（原子写入 + 逐次存档 + 变更流水）。
 # 切术语包会写 terms.yaml 与一条流水，但**业务数据表一个字节都不动**。
 id: research_template
+namespace: research   # 扩展点键前缀（D40）：本插件的界面扩展点都写在 `research.` 下面
 name: Research Templates
 label_cn: 科研模板与术语包
 version: 0.1.0
@@ -14,6 +15,8 @@ permissions:
   write: true      # 装模板、切术语包、登记方法文档都会写项目
   network: false
 
+# 声明式前置条件（D38）：模板插件对项目没有额外要求（它就是来装模板的）
+requires: {}
 surfaces:
   desktop_gui: true
   desktop_cli: true
