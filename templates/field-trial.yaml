@@ -1,0 +1,148 @@
+# 田间试验模板（农业通用，合成示例）
+#
+# 用途：研究 → 小区 → 事件 → 样本 → 观测 的完整链条，附因素/处理字典、
+#       方法文档索引与媒体索引。字段的**含义**全在这里（内核不认识"小区""处理"）。
+#
+# 设计要点：
+# - 所有引用都显式声明（reference），引用断裂会被 validate 与导入检查抓出
+# - 数值字段给出建议取值范围（range），超范围只提醒不阻塞
+# - 分类字段给出允许值（allowed_values，分号分隔）
+
+name: field-trial
+label_cn: 田间试验（农业通用）
+label_en: Field trial (agronomy)
+terms_profile: agriculture
+notes: 合成模板：研究 → 小区 → 事件 → 样本 → 观测；含因素/处理字典、方法文档与媒体索引。
+
+tables:
+  - name: studies
+    label_cn: 研究
+    label_en: Study
+    primary_key: study_id
+    notes: 一个研究 = 一次试验（可跨年、跨地点）
+    fields:
+      - { name: study_id, label_cn: 研究编号, label_en: Study ID, type: text, required: true, notes: "全局唯一，人可读，如 ST-2026-001" }
+      - { name: name, label_cn: 名称, label_en: Name, type: text, required: true }
+      - { name: crop, label_cn: 作物, label_en: Crop, type: text, notes: "如 水稻 / 小麦 / 玉米" }
+      - { name: design, label_cn: 试验设计, label_en: Design, type: text, allowed_values: "随机区组;裂区;条区;拉丁方;其他" }
+      - { name: location, label_cn: 地点, label_en: Location, type: text }
+      - { name: start_date, label_cn: 开始日期, label_en: Start date, type: date }
+      - { name: end_date, label_cn: 结束日期, label_en: End date, type: date }
+      - { name: notes, label_cn: 备注, label_en: Notes, type: text }
+
+  - name: factors
+    label_cn: 因素
+    label_en: Factor
+    primary_key: factor_id
+    notes: 试验因素的字典（氮肥、密度、品种……）
+    fields:
+      - { name: factor_id, label_cn: 因素编号, label_en: Factor ID, type: text, required: true, notes: "如 nitrogen / density" }
+      - { name: name, label_cn: 因素名称, label_en: Factor name, type: text, required: true }
+      - { name: kind, label_cn: 类型, label_en: Kind, type: text, allowed_values: "定量;定性" }
+      - { name: unit, label_cn: 单位, label_en: Unit, type: text, notes: "定量因素的单位，如 kg/ha" }
+      - { name: levels, label_cn: 水平, label_en: Levels, type: text, notes: "各水平取值，分号分隔" }
+      - { name: notes, label_cn: 备注, label_en: Notes, type: text }
+
+  - name: treatments
+    label_cn: 处理
+    label_en: Treatment
+    primary_key: treatment_id
+    fields:
+      - { name: treatment_id, label_cn: 处理编号, label_en: Treatment ID, type: text, required: true }
+      - { name: study_id, label_cn: 所属研究, label_en: Study, type: text, required: true, reference: studies.study_id }
+      - { name: factor_id, label_cn: 对应因素, label_en: Factor, type: text, reference: factors.factor_id }
+      - { name: level, label_cn: 水平, label_en: Level, type: text, notes: "该处理在这个因素上的取值" }
+      - { name: amount, label_cn: 用量, label_en: Amount, type: number, unit: kg/ha, range: [0, 2000] }
+      - { name: notes, label_cn: 备注, label_en: Notes, type: text }
+
+  - name: units
+    label_cn: 实验单元
+    label_en: Unit
+    primary_key: unit_id
+    notes: 农业场景通常就是"小区"；医学场景可能是"病区"，名称由术语包决定
+    fields:
+      - { name: unit_id, label_cn: 单元编号, label_en: Unit ID, type: text, required: true }
+      - { name: study_id, label_cn: 所属研究, label_en: Study, type: text, required: true, reference: studies.study_id }
+      - { name: block, label_cn: 区组, label_en: Block, type: text, notes: "随机区组里的区组号" }
+      - { name: treatment_id, label_cn: 处理, label_en: Treatment, type: text, reference: treatments.treatment_id }
+      - { name: area_m2, label_cn: 面积, label_en: Area, type: number, unit: m2, range: [0.1, 10000] }
+      - { name: notes, label_cn: 备注, label_en: Notes, type: text }
+
+  - name: events
+    label_cn: 事件
+    label_en: Event
+    primary_key: event_id
+    notes: 农事操作与取样事件（播种、施肥、取样、测产……）
+    fields:
+      - { name: event_id, label_cn: 事件编号, label_en: Event ID, type: text, required: true }
+      - { name: study_id, label_cn: 所属研究, label_en: Study, type: text, required: true, reference: studies.study_id }
+      - { name: date, label_cn: 日期, label_en: Date, type: date, required: true }
+      - { name: stage, label_cn: 生育期, label_en: Stage, type: text, allowed_values: "播种;出苗;分蘖;拔节;抽穗;开花;灌浆;成熟;收获;其他" }
+      - { name: event_type, label_cn: 类型, label_en: Type, type: text, allowed_values: "田间操作;取样;测产;观测;其他" }
+      - { name: title, label_cn: 名称, label_en: Title, type: text }
+      - { name: operator, label_cn: 操作人, label_en: Operator, type: text }
+      - { name: notes, label_cn: 备注, label_en: Notes, type: text }
+
+  - name: samples
+    label_cn: 样本
+    label_en: Sample
+    primary_key: sample_id
+    fields:
+      - { name: sample_id, label_cn: 样本编号, label_en: Sample ID, type: text, required: true }
+      - { name: event_id, label_cn: 来源事件, label_en: Event, type: text, required: true, reference: events.event_id }
+      - { name: unit_id, label_cn: 来源单元, label_en: Unit, type: text, reference: units.unit_id }
+      # 父样本也是样本：声明引用后，"拆分样指向一个不存在的父样本"会被抓出来
+      - { name: parent_sample_id, label_cn: 父样本, label_en: Parent sample, type: text, reference: samples.sample_id }
+      - { name: sample_type, label_cn: 样本类型, label_en: Sample type, type: text, allowed_values: "土壤;植株;籽粒;水;其他" }
+      - { name: depth_cm, label_cn: 取样深度, label_en: Depth, type: number, unit: cm, range: [0, 200] }
+      - { name: fresh_weight_g, label_cn: 鲜重, label_en: Fresh weight, type: number, unit: g, range: [0, 100000] }
+      - { name: notes, label_cn: 备注, label_en: Notes, type: text }
+
+  - name: observations
+    label_cn: 观测
+    label_en: Observation
+    primary_key: obs_id
+    notes: 一行 = 一个样本在某个指标上的一次测定（长表）
+    fields:
+      - { name: obs_id, label_cn: 记录编号, label_en: Observation ID, type: text, required: true }
+      - { name: sample_id, label_cn: 关联样本, label_en: Sample, type: text, required: true, reference: samples.sample_id }
+      - { name: trait_id, label_cn: 指标编号, label_en: Trait ID, type: text, required: true, notes: "如 height_cm / spad / yield_kg" }
+      - { name: value_num, label_cn: 数值, label_en: Value, type: number }
+      - { name: unit, label_cn: 计量单位, label_en: Unit, type: text }
+      - { name: method_id, label_cn: 测定方法, label_en: Method, type: text, reference: methods.method_id }
+      - { name: batch_id, label_cn: 批次, label_en: Batch, type: text }
+      - { name: measured_at, label_cn: 测定时间, label_en: Measured at, type: date }
+      - { name: operator, label_cn: 测定人, label_en: Operator, type: text }
+      - { name: notes, label_cn: 备注, label_en: Notes, type: text, notes: "平行样、异常值等情况写在这里" }
+
+  - name: methods
+    label_cn: 方法文档
+    label_en: Method
+    primary_key: method_id
+    notes: 方案 / SOP / 计算公式 / 偏差记录的登记与检索；正文放在项目内 methods/ 目录
+    fields:
+      - { name: method_id, label_cn: 方法编号, label_en: Method ID, type: text, required: true }
+      - { name: title, label_cn: 标题, label_en: Title, type: text, required: true }
+      - { name: category, label_cn: 类别, label_en: Category, type: text, allowed_values: "方案;SOP;计算公式;偏差记录;其他" }
+      - { name: version, label_cn: 版本, label_en: Version, type: text, notes: "如 v1.2" }
+      - { name: file, label_cn: 文件路径, label_en: File, type: text, notes: "相对项目根，如 methods/sop-spad.md" }
+      - { name: effective_date, label_cn: 生效日期, label_en: Effective date, type: date }
+      - { name: notes, label_cn: 备注, label_en: Notes, type: text }
+
+  - name: media
+    label_cn: 媒体
+    label_en: Media
+    primary_key: media_id
+    notes: 照片 / 视频 / 扫描件的索引；文件本身放在项目 media/ 目录
+    fields:
+      - { name: media_id, label_cn: 媒体编号, label_en: Media ID, type: text, required: true }
+      - { name: event_id, label_cn: 关联事件, label_en: Event, type: text, reference: events.event_id }
+      - { name: sample_id, label_cn: 关联样本, label_en: Sample, type: text, reference: samples.sample_id }
+      - { name: kind, label_cn: 类型, label_en: Kind, type: text, allowed_values: "照片;视频;音频;扫描件" }
+      - { name: path, label_cn: 相对路径, label_en: Path, type: text, required: true }
+      - { name: mode, label_cn: 模式, label_en: Mode, type: text, allowed_values: "imported;referenced" }
+      - { name: sha256, label_cn: 内容指纹, label_en: SHA-256, type: text }
+      - { name: taken_at, label_cn: 拍摄时间, label_en: Taken at, type: datetime }
+      - { name: device, label_cn: 设备, label_en: Device, type: text }
+      - { name: caption, label_cn: 说明, label_en: Caption, type: text }
+      - { name: consent, label_cn: 允许外传, label_en: Consent, type: text, allowed_values: "是;否", notes: "默认否；分享包只收「是」的内容" }

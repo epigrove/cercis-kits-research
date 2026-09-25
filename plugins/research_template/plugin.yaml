@@ -1,0 +1,50 @@
+# 科研模板与术语包（科研工具包插件）
+#
+# 它只做"选择与调用"：真正写项目的是内核通道（原子写入 + 逐次存档 + 变更流水）。
+# 切术语包会写 terms.yaml 与一条流水，但**业务数据表一个字节都不动**。
+id: research_template
+name: Research Templates
+label_cn: 科研模板与术语包
+version: 0.1.0
+tier: research
+requires_plugin_api: 1
+
+permissions:
+  read: true
+  write: true      # 装模板、切术语包、登记方法文档都会写项目
+  network: false
+
+surfaces:
+  desktop_gui: true
+  desktop_cli: true
+  tablet: false
+  phone: false
+
+ui:
+  - kind: command
+    id: research.install_template
+    command: install
+    label_cn: 装入科研模板…
+    label_en: Install research template…
+    placement: wizard
+  - kind: command
+    id: research.set_terms
+    command: terms
+    label_cn: 切换术语包…
+    label_en: Switch terminology…
+    placement: settings
+  - kind: command
+    id: research.method_add
+    command: method add
+    label_cn: 登记方法文档…
+    label_en: Register method…
+    placement: tools
+  - kind: command
+    id: research.method_list
+    command: method list
+    label_cn: 方法文档清单
+    label_en: Method list
+    placement: tools
+
+entrypoint: cercis-plugin-research-template
+description: 田间试验等科研模板、农业/医学/通用术语包、方法文档登记与检索；只改结构与显示名，不动既有数据

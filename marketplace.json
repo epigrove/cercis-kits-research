@@ -1,0 +1,20 @@
+{
+  "schema": "cercis.marketplace/1",
+  "name": "科研工具包",
+  "label_cn": "科研工具包（官方）",
+  "label_en": "Research kit (official)",
+  "description": "科研专用插件：科研模板、术语包、方法文档，以及后续的导入导出、打印标签、田间录入员。随 app 预置为默认市场，但插件默认不下载。",
+  "repository": "https://github.com/epigrove/cercis-kits-research",
+  "plugins": [
+    {
+      "id": "research_template",
+      "name": "科研模板与术语包",
+      "path": "plugins/research_template",
+      "version": "0.1.0",
+      "tier": "research",
+      "requires_plugin_api": 1,
+      "permissions": "读取数据、写入数据",
+      "summary": "装入田间试验等科研模板；切换农业/医学/通用术语；登记与检索方法文档"
+    }
+  ]
+}

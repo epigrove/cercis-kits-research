@@ -1,0 +1,53 @@
+# 农业术语包：田间试验的日常说法
+schema: cercis.terms/1
+profile: agriculture
+label_cn: 农业术语包
+label_en: Agronomy terms
+tables:
+  studies:
+    label_cn: 试验
+    label_en: Trial
+  factors:
+    label_cn: 试验因素
+    label_en: Factor
+    fields:
+      levels: { label_cn: 水平设置, label_en: Levels }
+  treatments:
+    label_cn: 处理
+    label_en: Treatment
+    fields:
+      amount: { label_cn: 施用量, label_en: Application rate }
+  units:
+    label_cn: 小区
+    label_en: Plot
+    fields:
+      unit_id: { label_cn: 小区编号, label_en: Plot ID }
+      block: { label_cn: 区组, label_en: Block }
+      area_m2: { label_cn: 小区面积, label_en: Plot area }
+  events:
+    label_cn: 农事记录
+    label_en: Field operation
+    fields:
+      stage: { label_cn: 生育期, label_en: Growth stage }
+      operator: { label_cn: 操作人, label_en: Operator }
+  samples:
+    label_cn: 样品
+    label_en: Sample
+    fields:
+      depth_cm: { label_cn: 取样深度, label_en: Sampling depth }
+      fresh_weight_g: { label_cn: 鲜重, label_en: Fresh weight }
+  observations:
+    label_cn: 测定记录
+    label_en: Measurement
+    fields:
+      value_num: { label_cn: 测定值, label_en: Measured value }
+      measured_at: { label_cn: 测定日期, label_en: Measured on }
+      operator: { label_cn: 测定人, label_en: Measured by }
+  methods:
+    label_cn: 方法与 SOP
+    label_en: Methods & SOP
+  media:
+    label_cn: 田间照片与扫描件
+    label_en: Field media
+    fields:
+      caption: { label_cn: 现场说明, label_en: Caption }

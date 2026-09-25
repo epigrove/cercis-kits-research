@@ -21,13 +21,34 @@ Cercis 的科研专用插件集合。**与基础工具包（`cercis-kits-basic`�
 
 ## 当前状态
 
-**占位阶段**：目录与说明已就位，代码按里程碑 **S7–S9** 推进：
+**S7 已完成**（科研字段模板 · 术语包 · 方法文档），代码结构如下：
+
+```
+research/
+├── templates/field-trial.yaml   田间试验模板（9 张表，引用与取值范围已声明）
+├── terms/                      术语包：generic / agriculture / medicine
+├── crates/plugin-research-template/   插件：装模板、切术语、登记方法文档
+├── plugins/research_template/  插件清单（plugin.yaml）与说明
+└── marketplace.json            本仓库作为 app 默认预置的插件市场清单
+```
+
+```bash
+# 构建与测试（需要内核已构建）
+cargo build && cargo test     # 含跨进程端到端：装模板 → 写数据 → 换术语包 → 数据字节不变
+
+# 手工试一遍
+export CERCIS_BIN=<内核路径> CERCIS_RESEARCH_DIR=$PWD
+./target/debug/cercis-plugin-research-template list
+./target/debug/cercis-plugin-research-template install --project <项目> --template field-trial --terms agriculture --allow-write
+```
+
+后续（S8–S9）：
 
 | 步骤 | 内容 | 验收 |
 |------|------|------|
-| S7 | 科研字段模板、术语包、方法文档 | 加载科研模板后界面出现研究/实验单元/样本/观测等字段；换术语包不影响数据 |
+| S7 ✅ | 科研字段模板、术语包、方法文档 | 加载科研模板后界面出现研究/小区/样本/观测等字段；换术语包不影响数据（**已通过字节级测试**） |
 | S8 | xlsx/docx 向导、扫描识别流程、SPSS/R 脚本、codebook、宽表与透视 | 两类记录表导入成功；SPSS 标签正确；导出说明书半年后可读 |
-| S9 | 学科校验、打印记录表、二维码标签、媒体管理、历史审阅、NAS、待办 | 跑通"生成记录表 → 手写 → 扫描 → 核对 → 入库"；NAS 工作副本可离线记录并合并 |
+| S9 | 学科校验、打印记录表、二维码标签、媒体管理、历史审阅、NAS、待办、田间录入员（§7.18） | 跑通"生成记录表 → 手写 → 扫描 → 核对 → 入库"；NAS 工作副本可离线记录并合并 |
 
 ## 计划中的插件形态
 

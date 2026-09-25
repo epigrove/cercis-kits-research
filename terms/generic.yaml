@@ -1,0 +1,15 @@
+# 通用术语包：不偏向任何学科的说法（默认）
+schema: cercis.terms/1
+profile: generic
+label_cn: 通用术语包
+label_en: Generic terms
+tables:
+  studies: { label_cn: 研究, label_en: Study }
+  factors: { label_cn: 因素, label_en: Factor }
+  treatments: { label_cn: 处理, label_en: Treatment }
+  units: { label_cn: 实验单元, label_en: Unit }
+  events: { label_cn: 事件, label_en: Event }
+  samples: { label_cn: 样本, label_en: Sample }
+  observations: { label_cn: 观测, label_en: Observation }
+  methods: { label_cn: 方法文档, label_en: Method }
+  media: { label_cn: 媒体, label_en: Media }

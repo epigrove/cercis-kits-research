@@ -1,0 +1,52 @@
+# 医学术语包：同一份数据结构，换成临床研究的说法（数据不动）
+schema: cercis.terms/1
+profile: medicine
+label_cn: 医学术语包
+label_en: Clinical terms
+tables:
+  studies:
+    label_cn: 临床研究
+    label_en: Clinical study
+  factors:
+    label_cn: 研究因素
+    label_en: Study factor
+  treatments:
+    label_cn: 干预
+    label_en: Intervention
+    fields:
+      amount: { label_cn: 剂量, label_en: Dose }
+  units:
+    label_cn: 受试单元
+    label_en: Study unit
+    fields:
+      unit_id: { label_cn: 受试编号, label_en: Subject ID }
+      block: { label_cn: 分层因素, label_en: Stratum }
+      area_m2: { label_cn: （不适用）, label_en: (not applicable) }
+  events:
+    label_cn: 访视
+    label_en: Visit
+    fields:
+      stage: { label_cn: 访视节点, label_en: Visit point }
+      operator: { label_cn: 记录者, label_en: Recorded by }
+  samples:
+    label_cn: 标本
+    label_en: Specimen
+    fields:
+      sample_type: { label_cn: 标本类型, label_en: Specimen type }
+      depth_cm: { label_cn: （不适用）, label_en: (not applicable) }
+      fresh_weight_g: { label_cn: 标本重量, label_en: Specimen weight }
+  observations:
+    label_cn: 检查结果
+    label_en: Result
+    fields:
+      trait_id: { label_cn: 检查项目, label_en: Test item }
+      value_num: { label_cn: 结果值, label_en: Result value }
+      measured_at: { label_cn: 检查日期, label_en: Test date }
+  methods:
+    label_cn: 方案与 SOP
+    label_en: Protocol & SOP
+  media:
+    label_cn: 影像资料
+    label_en: Imaging
+    fields:
+      caption: { label_cn: 影像说明, label_en: Image caption }
