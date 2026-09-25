@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/plugin-research-template", "crates/plugin-research-io"]
+members = [
+    "crates/plugin-research-template",
+    "crates/plugin-research-io",
+    "crates/plugin-research-scribe",
+]
 
 [workspace.package]
 version = "0.1.0"

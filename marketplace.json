@@ -25,6 +25,16 @@
       "requires_plugin_api": 1,
       "permissions": "读取数据、写入数据",
       "summary": "Excel 记录表导入（列映射 + 类型建议 + 试运行）；数据说明书；SPSS 与 R 导出（支持宽表）"
+    },
+    {
+      "id": "research_scribe",
+      "name": "田间录入员",
+      "path": "plugins/research_scribe",
+      "version": "0.1.0",
+      "tier": "research",
+      "requires_plugin_api": 1,
+      "permissions": "读取数据、写入数据；网络权限单独授予（默认离线）",
+      "summary": "语音或手稿照片 → 自动提示词 → 待确认草稿表 → 人工确认 → 经内核入库；模型可替换，离线优先"
     }
   ]
 }

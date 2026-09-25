@@ -1,0 +1,57 @@
+# 田间录入员（科研工具包插件）
+#
+# 边界：语音识别与多模态模型**都通过用户给的命令调用**（本地模型优先），
+# 插件自己不联网、不内置某家 SDK；入库一律走内核 append-many（一次事务、一条流水）。
+# 确认前只写项目里的 _labnote/scribe/<会话>/，主表一个字节都不动。
+id: research_scribe
+name: Field Scribe
+label_cn: 田间录入员
+version: 0.1.0
+tier: research
+requires_plugin_api: 1
+
+permissions:
+  read: true
+  write: true      # 会话目录 + 确认后入库（入库走内核通道）
+  network: false   # 插件本身不联网；要联网由用户给的模型命令决定
+
+surfaces:
+  desktop_gui: true
+  desktop_cli: true
+  tablet: true     # 田间主要用平板/手机
+  phone: true
+
+ui:
+  - kind: command
+    id: research.scribe_voice
+    command: voice
+    label_cn: 语音录入（念一遍）…
+    label_en: Voice entry…
+    placement: tools
+  - kind: command
+    id: research.scribe_photo
+    command: photo
+    label_cn: 手稿照片录入…
+    label_en: Handwritten sheet…
+    placement: tools
+  - kind: command
+    id: research.scribe_review
+    command: review
+    label_cn: 复核草稿与待确认清单
+    label_en: Review draft
+    placement: tools
+  - kind: command
+    id: research.scribe_commit
+    command: commit
+    label_cn: 确认入库
+    label_en: Commit to project
+    placement: tools
+  - kind: command
+    id: research.scribe_brief
+    command: brief
+    label_cn: 生成念读提示脚本
+    label_en: Reading script
+    placement: wizard
+
+entrypoint: cercis-plugin-research-scribe
+description: 语音/手稿照片 → 自动提示词 → 待确认草稿表 → 人工确认 → 经内核入库；支持离线（先录后处理）与任意模型替换

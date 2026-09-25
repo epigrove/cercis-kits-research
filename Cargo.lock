@@ -143,6 +143,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cercis-plugin-research-scribe"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "csv",
+ "hex",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "cercis-plugin-research-template"
 version = "0.1.0"
 dependencies = [

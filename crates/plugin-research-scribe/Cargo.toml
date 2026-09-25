@@ -1,0 +1,19 @@
+[package]
+name = "cercis-plugin-research-scribe"
+description = "Cercis 科研工具包插件 · 田间录入员：语音/手稿 → 大模型 → 待确认草稿 → 经内核入库"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "cercis-plugin-research-scribe"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+serde_json = { workspace = true }
+csv = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+chrono = { workspace = true }
