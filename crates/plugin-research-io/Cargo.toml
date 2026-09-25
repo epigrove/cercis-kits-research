@@ -1,0 +1,23 @@
+[package]
+name = "cercis-plugin-research-io"
+description = "Cercis 科研工具包插件 · 科研导入导出：Excel 记录表导入、SPSS/R 导出、codebook"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "cercis-plugin-research-io"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+serde_json = { workspace = true }
+# dates：把 Excel 的日期序列值转成真实日期（否则记录表里的日期会读成 45000 这种数字）
+calamine = { workspace = true, features = ["dates"] }
+csv = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+hex = { workspace = true }
+sha2 = { workspace = true }

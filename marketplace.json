@@ -15,6 +15,16 @@
       "requires_plugin_api": 1,
       "permissions": "读取数据、写入数据",
       "summary": "装入田间试验等科研模板；切换农业/医学/通用术语；登记与检索方法文档"
+    },
+    {
+      "id": "research_io",
+      "name": "科研导入导出",
+      "path": "plugins/research_io",
+      "version": "0.1.0",
+      "tier": "research",
+      "requires_plugin_api": 1,
+      "permissions": "读取数据、写入数据",
+      "summary": "Excel 记录表导入（列映射 + 类型建议 + 试运行）；数据说明书；SPSS 与 R 导出（支持宽表）"
     }
   ]
 }

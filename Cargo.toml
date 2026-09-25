@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/plugin-research-template"]
+members = ["crates/plugin-research-template", "crates/plugin-research-io"]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,3 +13,6 @@ clap = { version = "4", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 hex = "0.4"
+calamine = "0.26"
+csv = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }

@@ -1,0 +1,51 @@
+# 科研导入导出（科研工具包插件）
+#
+# 读写一律走内核通道：导入用 append-many（一次事务、一条流水），
+# 读用 query/template；插件自己不碰 tables/*.csv。
+# 类型与校验规则来自内核（value-types / infer-types），插件不自己写判断。
+id: research_io
+name: Research IO
+label_cn: 科研导入导出
+version: 0.1.0
+tier: research
+requires_plugin_api: 1
+
+permissions:
+  read: true
+  write: true      # 导入会写数据（走内核通道，留痕）
+  network: false
+
+surfaces:
+  desktop_gui: true
+  desktop_cli: true
+  tablet: false
+  phone: false
+
+ui:
+  - kind: command
+    id: research.import_xlsx
+    command: import-xlsx
+    label_cn: 导入 Excel 记录表…
+    label_en: Import Excel sheet…
+    placement: tools
+  - kind: command
+    id: research.codebook
+    command: codebook
+    label_cn: 生成数据说明书
+    label_en: Generate codebook
+    placement: tools
+  - kind: command
+    id: research.export_spss
+    command: export-spss
+    label_cn: 导出给 SPSS…
+    label_en: Export for SPSS…
+    placement: export
+  - kind: command
+    id: research.export_r
+    command: export-r
+    label_cn: 导出给 R…
+    label_en: Export for R…
+    placement: export
+
+entrypoint: cercis-plugin-research-io
+description: Excel 记录表导入（列映射 + 类型建议 + 试运行）、数据说明书、SPSS/R 导出（含宽表）；类型规则全部来自内核
