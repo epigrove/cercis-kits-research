@@ -83,8 +83,11 @@ pub fn render(template: &Value, value_types: &Value, table: Option<&str>) -> Res
         let ty = str_of(f, "type");
         let mut bits: Vec<String> = Vec::new();
         bits.push(ty.clone());
-        if let Some(rule) = types.get(&ty) {
-            bits.push(rule.clone());
+        // text 不用解释"怎么写"（就是原样文本），其余类型把写法与例子说清楚
+        if ty != "text" {
+            if let Some(rule) = types.get(&ty) {
+                bits.push(rule.clone());
+            }
         }
         if !str_of(f, "unit").is_empty() {
             bits.push(format!("单位 {}", str_of(f, "unit")));
