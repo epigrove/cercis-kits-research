@@ -411,8 +411,17 @@ fn spss_type(f: &Value) -> String {
     }
 }
 
-/// R 读取脚本：因子水平按模板允许值排序；标签写进变量属性。
-fn r_script(csv_name: &str, _table: &Value, out: &ExportOut) -> String {
+/// R 读取脚本：按模板声明的类型转换、写中文标签、按模板允许值定因子水平顺序。
+///
+/// 为什么值得生成脚本而不是只给 CSV：科研里最烦的两种错是
+/// "数值列被读成字符"和"图上的处理顺序与设计顺序不一致"——
+/// 两者都在这里一次做对（顺序取模板的允许值顺序，而不是字母序）。
+fn r_script(csv_name: &str, table: &Value, out: &ExportOut) -> String {
+    let fields = table
+        .get("fields")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
     let mut s = String::new();
     s.push_str("# 由 Cercis 科研工具包生成（R 读取脚本）\n");
     s.push_str(&format!("# 源数据指纹（sha256）：{}\n", if out.fingerprint.is_empty() { "（未取到）" } else { &out.fingerprint }));
@@ -421,17 +430,72 @@ fn r_script(csv_name: &str, _table: &Value, out: &ExportOut) -> String {
     s.push_str(&format!(
         "data <- read.csv(\"{csv_name}\",\n  header = TRUE, sep = \",\", quote = '\"',\n  na.strings = \"\", check.names = FALSE, fileEncoding = \"UTF-8\")\n\n"
     ));
-    s.push_str("# 类型：日期转 Date，数值转 numeric（有些列因空格会读成字符）\n");
-    for (i, c) in out.columns.iter().enumerate() {
-        s.push_str(&format!(
-            "data${c} <- if (is.character(data${c}) && all(grepl('^-?[0-9]+(\\\\.[0-9]+)?$', na.omit(data${c})))) as.numeric(data${c}) else data${c}\n"
-        ));
-        let _ = i;
-    }
-    s.push_str("\n# 变量标签（作图标题用）\n");
+
+    // 1. 类型转换：照模板来（模板是类型的唯一来源，见 §5.9 / D36）
+    s.push_str("# 类型：按模板声明的类型转（数值/整数 → numeric，日期 → Date）\n");
     for c in &out.columns {
-        s.push_str(&format!("# {c}\n"));
+        let f = field_of(&fields, c);
+        let declared = str_of(&f, "type");
+        let wide_value_column = out
+            .wide
+            .as_ref()
+            .map(|w| c != &w.index)
+            .unwrap_or(false);
+        match declared.as_str() {
+            "number" | "integer" => s.push_str(&format!(
+                "data${c} <- suppressWarnings(as.numeric(data${c}))\n"
+            )),
+            "date" => s.push_str(&format!(
+                "data${c} <- as.Date(data${c}, format = \"%Y-%m-%d\")\n"
+            )),
+            _ if wide_value_column => s.push_str(&format!(
+                "data${c} <- suppressWarnings(as.numeric(data${c}))  # 宽表指标列\n"
+            )),
+            _ => {}
+        }
     }
+
+    // 2. 因子水平：按模板声明的允许值顺序（保证"图上顺序 = 设计顺序"）
+    s.push_str("\n# 因子与水平顺序（按模板的允许值顺序，不是字母序）\n");
+    let mut factored = false;
+    for c in &out.columns {
+        let allowed = str_of(&field_of(&fields, c), "allowed_values");
+        let values: Vec<String> = allowed
+            .split(';')
+            .map(|x| x.trim())
+            .filter(|x| !x.is_empty())
+            .map(|x| format!("\"{}\"", x.replace('"', "\\\"")))
+            .collect();
+        if values.is_empty() {
+            continue;
+        }
+        s.push_str(&format!(
+            "data${c} <- factor(data${c}, levels = c({}))\n",
+            values.join(", ")
+        ));
+        factored = true;
+    }
+    if !factored {
+        s.push_str("# （模板里没有声明允许值的分类列）\n");
+    }
+
+    // 3. 中文标签：**放在因子转换之后**（factor() 会丢掉其它属性）
+    s.push_str("\n# 中文标签（作图标题、表格表头用）\n");
+    let mut labelled = false;
+    for c in &out.columns {
+        let label = str_of(&field_of(&fields, c), "label_cn");
+        if !label.is_empty() {
+            s.push_str(&format!(
+                "attr(data${c}, \"label\") <- \"{}\"\n",
+                label.replace('"', "\\\"")
+            ));
+            labelled = true;
+        }
+    }
+    if !labelled {
+        s.push_str("# （模板里没有中文标签）\n");
+    }
+
     s.push_str("\n# 想看数据概览：\n");
     s.push_str("summary(data)\n");
     s
