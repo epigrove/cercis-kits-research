@@ -39,15 +39,18 @@ struct WideInfo {
 
 /// CSV + `.sps`（SPSS 语法）。
 pub fn spss(kernel: &Kernel, args: &ExportArgs) -> R<Value> {
-    let (out, table, csv_rows) = prepare(kernel, args, "spss")?;
+    let (out, table, mut csv_rows) = prepare(kernel, args, "spss")?;
     let mut files = Vec::new();
+
+    // 值标签映射：分类列 → 1/2/3…（`--encode-values` 时真正落到 CSV）
+    let labels = value_label_map(&table, &out.columns, &mut csv_rows, args.encode_values);
 
     let csv_name = format!("{}.csv", out.table);
     let csv_path = out.dir.join(&csv_name);
     write_csv(&csv_path, &out.columns, &csv_rows)?;
     files.push(csv_path.clone());
 
-    let sps = spss_syntax(&csv_name, &out, &table)?;
+    let sps = spss_syntax(&csv_name, &out, &table, &labels, args.encode_values)?;
     let sps_path = out.dir.join(format!("{}.sps", out.table));
     std::fs::write(&sps_path, sps)?;
     files.push(sps_path);
@@ -303,6 +306,56 @@ fn to_wide(
     ))
 }
 
+/// 值标签映射：分类列 → [(编号, 取值)]。
+///
+/// 若 `encode` 为真，顺手把 CSV 里的取值替换成编号（SPSS 里用编号 + 值标签更常见，
+/// 也避免中文取值在不同编码下出问题）；为假时保留原文，标签仍然写进 `.sps`
+/// ——这样两种用法都不吃亏，用户自己选。
+fn value_label_map(
+    table: &Value,
+    columns: &[String],
+    rows: &mut [Row],
+    encode: bool,
+) -> Vec<(String, Vec<(usize, String)>)> {
+    let fields = table
+        .get("fields")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut out = Vec::new();
+    for col in columns {
+        let allowed = str_of(&field_of(&fields, col), "allowed_values");
+        let values: Vec<String> = allowed
+            .split(';')
+            .map(|x| x.trim().to_string())
+            .filter(|x| !x.is_empty())
+            .collect();
+        if values.is_empty() {
+            continue;
+        }
+        let pairs: Vec<(usize, String)> = values
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (i + 1, v.clone()))
+            .collect();
+        if encode {
+            for row in rows.iter_mut() {
+                let cell = row.get(col).cloned().unwrap_or_default();
+                if cell.trim().is_empty() {
+                    continue;
+                }
+                if let Some((code, _)) = pairs.iter().find(|(_, v)| v == cell.trim()) {
+                    row.insert(col.clone(), code.to_string());
+                }
+                // 不在允许值里的取值：原样留着（导出永不因校验阻断），
+                // SPSS 里会显示成未标注的编号，说明书里能查到
+            }
+        }
+        out.push((col.clone(), pairs));
+    }
+    out
+}
+
 fn write_csv(path: &Path, columns: &[String], rows: &[Row]) -> R<()> {
     let mut wtr = csv::WriterBuilder::new().from_path(path)?;
     wtr.write_record(columns)?;
@@ -318,7 +371,13 @@ fn write_csv(path: &Path, columns: &[String], rows: &[Row]) -> R<()> {
 }
 
 /// `.sps` 语法：变量标签、值标签、缺失值、格式。
-fn spss_syntax(csv_name: &str, out: &ExportOut, table: &Value) -> R<String> {
+fn spss_syntax(
+    csv_name: &str,
+    out: &ExportOut,
+    table: &Value,
+    labels: &[(String, Vec<(usize, String)>)],
+    encode_values: bool,
+) -> R<String> {
     let fields = table
         .get("fields")
         .and_then(|v| v.as_array())
@@ -362,33 +421,27 @@ fn spss_syntax(csv_name: &str, out: &ExportOut, table: &Value) -> R<String> {
         s.push_str("* （模板里没有中文标签）\n\n");
     }
 
-    // 值标签：分类列 ≤20 个取值时列全（用模板的允许值顺序）
+    // 值标签：分类列按模板的允许值顺序编号
     s.push_str("VALUE LABELS\n");
     let mut any_labels = false;
-    for v in &vars {
-        let f = field_of(&fields, v);
-        let allowed = str_of(&f, "allowed_values");
-        if allowed.is_empty() {
-            continue;
-        }
-        let values: Vec<&str> = allowed
-            .split(';')
-            .map(|x| x.trim())
-            .filter(|x| !x.is_empty())
-            .collect();
+    for (var, values) in labels {
         if values.is_empty() {
             continue;
         }
-        s.push_str(&format!("  {v}\n"));
-        for (i, val) in values.iter().enumerate() {
-            let num = i + 1;
-            s.push_str(&format!("    {num} '{val}'\n"));
+        s.push_str(&format!("  {var}\n"));
+        for (code, val) in values {
+            s.push_str(&format!("    {code} '{val}'\n"));
         }
         any_labels = true;
     }
     s.push_str(".\n\n");
     if !any_labels {
-        s.push_str("* （模板里没有声明允许值，故没有值标签）\n\n");
+        s.push_str("* （模板里没有声明允许值的分类列，故没有值标签）\n\n");
+    }
+    if encode_values {
+        s.push_str("* 分类列已按上面的编号编码落盘（--encode-values）。\n\n");
+    } else {
+        s.push_str("* 分类列目前保留原文；若希望按编号落盘，导出时加 --encode-values。\n\n");
     }
 
     // 缺失值：CSV 空单元格在 SPSS 里本就是 sysmis；这里只声明"占位符"不该出现

@@ -35,6 +35,16 @@
       "requires_plugin_api": 1,
       "permissions": "读取数据、写入数据；网络权限单独授予（默认离线）",
       "summary": "语音或手稿照片 → 自动提示词 → 待确认草稿表 → 人工确认 → 经内核入库；模型可替换，离线优先"
+    },
+    {
+      "id": "research_print",
+      "name": "打印与标签",
+      "path": "plugins/research_print",
+      "version": "0.1.0",
+      "tier": "research",
+      "requires_plugin_api": 1,
+      "permissions": "读取数据",
+      "summary": "从模板生成可打印记录表（A4 HTML/PDF）与二维码标签（小区牌、样品袋）；打印→手写→拍照回录的第一环"
     }
   ]
 }

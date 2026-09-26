@@ -159,6 +159,9 @@ struct ExportArgs {
     /// 同时把数据说明书放进导出目录
     #[arg(long)]
     codebook: bool,
+    /// 分类列按 1/2/3 编码落盘（SPSS 更常用；默认保留原文，标签仍会写进 .sps）
+    #[arg(long)]
+    encode_values: bool,
 }
 
 #[derive(Args, Debug)]

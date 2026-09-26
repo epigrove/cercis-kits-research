@@ -340,6 +340,40 @@ fn s8_import_codebook_and_exports() {
     assert_eq!(csv.lines().count(), 4, "表头 + 3 行：\n{csv}");
     assert!(spss_dir.join("导出说明.md").is_file(), "应写导出说明");
 
+    // 值编码：给了 --encode-values 就把分类列按模板允许值顺序落成 1/2/3，
+    // 并在 .sps 里写全 VALUE LABELS（导出的表还是原来的表——分类列在 samples 上）
+    let encoded_dir = dir.join("spss-encoded");
+    let (code, out) = plugin(
+        &io,
+        &kernel,
+        &[
+            "export-spss",
+            &p,
+            "--table",
+            "samples",
+            "--encode-values",
+            "--out",
+            &encoded_dir.display().to_string(),
+            "--json",
+        ],
+    );
+    assert_eq!(code, 0, "编码导出失败：{out}");
+    let samples_csv =
+        std::fs::read_to_string(encoded_dir.join("samples.csv")).expect("应有 samples.csv");
+    // 列顺序是模板顺序：sample_id,event_id,unit_id,parent_sample_id,sample_type,…
+    // 允许值 "土壤;植株;籽粒;水;其他" → 植株 = 2
+    let first = samples_csv.lines().nth(1).unwrap_or("");
+    let sample_type = first.split(',').nth(4).unwrap_or("");
+    assert_eq!(
+        sample_type, "2",
+        "sample_type=植株 应按允许值顺序编码成 2：{first}"
+    );
+    let samples_sps =
+        std::fs::read_to_string(encoded_dir.join("samples.sps")).expect("应有 .sps");
+    assert!(samples_sps.contains("VALUE LABELS"), "{samples_sps}");
+    assert!(samples_sps.contains("'植株'"), "标签里要有原文：{samples_sps}");
+    assert!(samples_sps.contains("--encode-values"), "{samples_sps}");
+
     // 6. 导出 R + 宽表
     let r_dir = dir.join("r");
     let (code, out) = plugin(

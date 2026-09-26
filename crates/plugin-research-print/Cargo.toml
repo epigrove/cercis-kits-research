@@ -1,0 +1,17 @@
+[package]
+name = "cercis-plugin-research-print"
+description = "Cercis 科研工具包插件 · 打印与标签：从模板生成可打印记录表（HTML/PDF）与二维码标签"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "cercis-plugin-research-print"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+serde_json = { workspace = true }
+qrcode = { workspace = true }
+chrono = { workspace = true }

@@ -1,0 +1,50 @@
+# 打印与标签（科研工具包插件）
+#
+# 只读项目（经内核读模板与数据），产出两个 HTML：可打印的记录表与二维码标签。
+# 打印件上带列名与允许值提示，回录时对着看；标签二维码内容形如
+# `cercis:<项目编号>:<表>:<编号>`，扫码即可定位记录。
+id: research_print
+namespace: research   # 扩展点键前缀（D40）：本插件的界面扩展点都写在 `research.` 下面
+name: Print & Labels
+label_cn: 打印与标签
+version: 0.1.0
+tier: research
+requires_plugin_api: 1
+
+# 声明式前置条件（D38）：要有表可印
+requires:
+  tables: [observations]
+
+permissions:
+  read: true
+  write: false     # 只往项目的 exports/ 目录写产物，不动数据
+  network: false
+
+surfaces:
+  desktop_gui: true
+  desktop_cli: true
+  tablet: false
+  phone: false
+
+ui:
+  - kind: command
+    id: research.print_sheet
+    command: sheet
+    label_cn: 生成打印记录表…
+    label_en: Printable record sheet…
+    placement: tools
+  - kind: command
+    id: research.print_labels
+    command: labels
+    label_cn: 生成二维码标签…
+    label_en: QR labels…
+    placement: tools
+  - kind: command
+    id: research.print_list
+    command: list
+    label_cn: 看有哪些可打印的表
+    label_en: List printable tables
+    placement: tools
+
+entrypoint: cercis-plugin-research-print
+description: 从模板生成可打印记录表（A4 HTML，装了 Chrome/Edge 可同时出 PDF）与二维码标签（小区牌、样品袋贴纸）；数据只读
