@@ -231,6 +231,7 @@ pub fn review_json(r: &Review, session_id: &str, table: &str) -> Value {
         "rows": r.rows.len(),
         "columns": r.columns.len(),
         "must_confirm": r.uncertain.iter().filter(|u| u.must_confirm).count(),
+        "low_confidence": r.uncertain.iter().filter(|u| u.kind == "low_confidence").count(),
         "uncertain": uncertain_json(&r.uncertain),
         "blocking": r.blocking,
         "warnings": r.warnings,
@@ -245,13 +246,19 @@ pub fn review_human(r: &Review, session_id: &str, table: &str) -> String {
         r.rows.len()
     ));
     let must = r.uncertain.iter().filter(|u| u.must_confirm).count();
+    let low = r
+        .uncertain
+        .iter()
+        .filter(|u| u.kind == "low_confidence")
+        .count();
     if r.uncertain.is_empty() {
         s.push_str("待确认清单：空（模型没报不确定项，内核也没报错）\n");
     } else {
         s.push_str(&format!(
-            "待确认 {} 项（其中必须人工确认 {} 项）：\n",
+            "待确认 {} 项（其中必须人工确认 {} 项，低置信度 {} 个格子）：\n",
             r.uncertain.len(),
-            must
+            must,
+            low
         ));
         for u in &r.uncertain {
             s.push_str(&format!(

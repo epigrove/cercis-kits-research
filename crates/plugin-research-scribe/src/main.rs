@@ -510,18 +510,35 @@ fn write_draft(
     let columns: Vec<String> = fields.iter().map(|f| f.name.clone()).collect();
     let draft_path = s.path(&format!("{}.draft.csv", b.table));
     row::write_csv(&draft_path, &columns, &parsed.rows)?;
+    // 逐格置信度：模型自报与规则判定取较小值（离线也有底线）
+    let low = model::low_confidence_cells(&parsed.rows, &parsed.confidence, model::LOW_CONFIDENCE);
+    s.write(
+        &format!("{}.confidence.json", b.table),
+        &serde_json::to_string_pretty(&model::confidence_json(&parsed.rows, &parsed.confidence))
+            .unwrap_or_default(),
+    )?;
+    // 低置信度的格子并进"待确认"清单（复核时逐个点名）
+    let mut uncertain = parsed.uncertain.clone();
+    for l in &low {
+        if !uncertain
+            .iter()
+            .any(|u| u.index == l.index && u.field == l.field)
+        {
+            uncertain.push(l.clone());
+        }
+    }
     s.write(
         "raw.json",
         &serde_json::to_string_pretty(answer).unwrap_or_default(),
     )?;
-    let must = parsed.uncertain.iter().filter(|u| u.must_confirm).count();
+    let must = uncertain.iter().filter(|u| u.must_confirm).count();
     s.write(
         "待确认.md",
         &model::review_markdown(
             &s.id,
             &b.table,
             parsed.rows.len(),
-            &parsed.uncertain,
+            &uncertain,
             &parsed.notes,
             &parsed.ignored_keys,
             &[],
@@ -529,8 +546,7 @@ fn write_draft(
     )?;
     s.write(
         &format!("{}.uncertain.json", b.table),
-        &serde_json::to_string_pretty(&model::uncertain_json(&parsed.uncertain))
-            .unwrap_or_default(),
+        &serde_json::to_string_pretty(&model::uncertain_json(&uncertain)).unwrap_or_default(),
     )?;
     s.patch_meta(json!({
         "status": "draft",
@@ -538,6 +554,8 @@ fn write_draft(
         "template_fingerprint": b.template_fingerprint,
         "rows": parsed.rows.len(),
         "must_confirm": must,
+        "low_confidence": low.len(),
+        "confidence_file": format!("{}.confidence.json", b.table),
         "ignored_keys": parsed.ignored_keys,
         "model_name": model_name,
         "draft": draft_path.display().to_string(),
@@ -555,7 +573,9 @@ fn write_draft(
                 "draft": draft_path.display().to_string(),
                 "rows": parsed.rows.len(),
                 "must_confirm": must,
-                "uncertain": model::uncertain_json(&parsed.uncertain),
+                "low_confidence": low.len(),
+                "confidence_file": format!("{}.confidence.json", b.table),
+                "uncertain": model::uncertain_json(&uncertain),
                 "ignored_keys": parsed.ignored_keys,
                 "template_fingerprint": b.template_fingerprint,
             }))
@@ -569,8 +589,10 @@ fn write_draft(
             draft_path.display()
         );
         println!(
-            "待确认 {must} 项（数值与必填项必须人工过眼）｜原始输出与照片/录音都在会话目录里"
+            "待确认 {must} 项（数值与必填项必须人工过眼）｜低置信度格子 {} 个｜原始输出与照片/录音都在会话目录里",
+            low.len()
         );
+        println!("  逐格置信度：{}", format!("{}.confidence.json", b.table));
         println!("复核：scribe review --session {}", s.id);
         println!("入库：scribe commit --session {} --confirm", s.id);
     }

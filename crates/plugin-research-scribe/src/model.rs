@@ -42,7 +42,33 @@ pub struct Parsed {
     pub notes: Vec<String>,
     /// 模型给了但模板里没有的键
     pub ignored_keys: Vec<String>,
+    /// **逐格置信度**：与 `rows` 一一对应（第 i 行 → 字段 → 分数）
+    pub confidence: Vec<std::collections::BTreeMap<String, CellScore>>,
 }
+
+/// 一个格子的置信度：模型自报与规则判定取**较小值**（保守）。
+#[derive(Debug, Clone, PartialEq)]
+pub struct CellScore {
+    /// 0.0–1.0
+    pub score: f32,
+    /// `model` / `heuristic` / `both`
+    pub source: String,
+    /// 为什么给这个分（给复核的人看）
+    pub reason: String,
+}
+
+impl CellScore {
+    fn new(score: f32, source: &str, reason: &str) -> Self {
+        Self {
+            score: score.clamp(0.0, 1.0),
+            source: source.to_string(),
+            reason: reason.to_string(),
+        }
+    }
+}
+
+/// 低于这个分数的格子要在复核里点名。
+pub const LOW_CONFIDENCE: f32 = 0.7;
 
 /// 解析模型返回的 JSON。
 ///
@@ -65,6 +91,7 @@ pub fn parse_answer(answer: &Value, fields: &[FieldInfo]) -> R<Parsed> {
     let known: Vec<&str> = fields.iter().map(|f| f.name.as_str()).collect();
     let mut rows: Vec<Row> = Vec::new();
     let mut ignored_keys: Vec<String> = Vec::new();
+    let mut model_conf: Vec<std::collections::BTreeMap<String, (f32, String)>> = Vec::new();
 
     for item in &rows_value {
         let obj = item.as_object().ok_or_else(|| {
@@ -74,7 +101,30 @@ pub fn parse_answer(answer: &Value, fields: &[FieldInfo]) -> R<Parsed> {
             )
         })?;
         let mut row = Row::new();
+        let mut conf = std::collections::BTreeMap::new();
         for (k, v) in obj {
+            // 逐格置信度：`"confidence": {"株高": 0.8}` 或 {"株高": {"score": 0.8, "reason": "…"}}
+            if k == "confidence" {
+                if let Some(map) = v.as_object() {
+                    for (fname, cv) in map {
+                        let (score, reason) = match cv {
+                            Value::Number(n) => (n.as_f64().unwrap_or(0.0) as f32, String::new()),
+                            Value::Object(o) => (
+                                o.get("score")
+                                    .and_then(|s| s.as_f64())
+                                    .unwrap_or(0.0) as f32,
+                                o.get("reason")
+                                    .and_then(|s| s.as_str())
+                                    .unwrap_or("")
+                                    .to_string(),
+                            ),
+                            _ => continue,
+                        };
+                        conf.insert(fname.clone(), (score.clamp(0.0, 1.0), reason));
+                    }
+                }
+                continue;
+            }
             if !known.contains(&k.as_str()) {
                 if !ignored_keys.contains(k) {
                     ignored_keys.push(k.clone());
@@ -87,6 +137,38 @@ pub fn parse_answer(answer: &Value, fields: &[FieldInfo]) -> R<Parsed> {
             row.entry(f.name.clone()).or_default();
         }
         rows.push(row);
+        model_conf.push(conf);
+    }
+
+    // 逐格置信度 = min(模型自报, 规则判定)：模型没说就只看规则；规则也拿不准就低分
+    let mut confidence: Vec<std::collections::BTreeMap<String, CellScore>> = Vec::new();
+    for (i, row) in rows.iter().enumerate() {
+        let mut cells = std::collections::BTreeMap::new();
+        for f in fields {
+            let value = row.get(&f.name).map(|s| s.as_str()).unwrap_or("");
+            let (h, why) = heuristic_score(f, value);
+            let model = model_conf.get(i).and_then(|m| m.get(&f.name).cloned());
+            let cell = match model {
+                Some((m, reason)) => {
+                    let (score, source) = if m < h {
+                        (m, "model")
+                    } else if (m - h).abs() < 0.001 {
+                        (m, "both")
+                    } else {
+                        (h, "heuristic")
+                    };
+                    let why = if reason.trim().is_empty() {
+                        why.to_string()
+                    } else {
+                        format!("{why}；模型说：{reason}")
+                    };
+                    CellScore::new(score, source, &why)
+                }
+                None => CellScore::new(h, "heuristic", why),
+            };
+            cells.insert(f.name.clone(), cell);
+        }
+        confidence.push(cells);
     }
 
     // 待确认：模型自己报的
@@ -157,6 +239,116 @@ pub fn parse_answer(answer: &Value, fields: &[FieldInfo]) -> R<Parsed> {
         uncertain,
         notes,
         ignored_keys,
+        confidence,
+    })
+}
+
+/// 规则判定的置信度（不依赖模型，离线也有底线）：
+/// - 数值列：能解析成数字 → 0.9；解析不了 → 0.3
+/// - 日期列：`YYYY-MM-DD` → 0.95；别的写法 → 0.4
+/// - 必填为空 → 0.2；选填为空 → 0.75
+/// - 文本里有"可能/大约/？/听不清"这类字样 → 0.4
+/// - 其它非空文本 → 0.8
+fn heuristic_score(f: &FieldInfo, value: &str) -> (f32, &'static str) {
+    let v = value.trim();
+    if v.is_empty() {
+        return if f.required {
+            (0.2, "必填但为空")
+        } else {
+            (0.75, "选填为空（缺失留空是允许的）")
+        };
+    }
+    match f.field_type.as_str() {
+        "number" | "integer" => {
+            if v.parse::<f64>().is_ok() {
+                (0.9, "数值格式正确")
+            } else {
+                (0.3, "看不清是不是数字")
+            }
+        }
+        "date" => {
+            if chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d").is_ok() {
+                (0.95, "日期格式正确")
+            } else {
+                (0.4, "日期写法不认识（应为 YYYY-MM-DD）")
+            }
+        }
+        "datetime" => {
+            if chrono::NaiveDateTime::parse_from_str(v, "%Y-%m-%d %H:%M:%S").is_ok()
+                || chrono::DateTime::parse_from_rfc3339(v).is_ok()
+            {
+                (0.95, "时间格式正确")
+            } else {
+                (0.4, "时间写法不认识")
+            }
+        }
+        "bool" => match v {
+            "true" | "false" | "是" | "否" | "有" | "无" => (0.95, "布尔值明确"),
+            _ => (0.45, "是不是/否的意思拿不准"),
+        },
+        _ => {
+            let fuzzy = ["可能", "大约", "大概", "?", "？", "听不清", "没看清", "差不多"];
+            if fuzzy.iter().any(|k| v.contains(k)) {
+                (0.4, "话里有不确定的字样")
+            } else if v.len() > 60 {
+                (0.6, "长文本容易听岔")
+            } else {
+                (0.8, "普通文本")
+            }
+        }
+    }
+}
+
+/// 低于阈值的格子（复核时点名用）。
+pub fn low_confidence_cells(
+    rows: &[Row],
+    confidence: &[std::collections::BTreeMap<String, CellScore>],
+    threshold: f32,
+) -> Vec<Uncertain> {
+    let mut out = Vec::new();
+    for (i, cells) in confidence.iter().enumerate() {
+        for (field, c) in cells {
+            if c.score < threshold {
+                let _ = rows.get(i);
+                out.push(Uncertain {
+                    index: i + 1,
+                    field: field.clone(),
+                    reason: format!("置信度 {:.2}（{}）：{}", c.score, c.source, c.reason),
+                    kind: "low_confidence".into(),
+                    must_confirm: false,
+                });
+            }
+        }
+    }
+    out.sort_by(|a, b| a.index.cmp(&b.index).then(a.field.cmp(&b.field)));
+    out
+}
+
+/// 逐格置信度落成 JSON（存进会话目录，复核与 app 都读它）。
+pub fn confidence_json(
+    rows: &[Row],
+    confidence: &[std::collections::BTreeMap<String, CellScore>],
+) -> Value {
+    let mut out_rows = Vec::new();
+    for (i, cells) in confidence.iter().enumerate() {
+        let mut obj = serde_json::Map::new();
+        for (field, c) in cells {
+            obj.insert(
+                field.clone(),
+                json!({
+                    "score": (c.score * 100.0).round() / 100.0,
+                    "source": c.source,
+                    "reason": c.reason,
+                    "value": rows.get(i).and_then(|r| r.get(field)).cloned().unwrap_or_default(),
+                }),
+            );
+        }
+        out_rows.push(json!({ "index": i + 1, "cells": Value::Object(obj) }));
+    }
+    json!({
+        "format": "cercis-scribe-confidence/1",
+        "threshold": LOW_CONFIDENCE,
+        "rows": out_rows,
     })
 }
 
@@ -433,6 +625,52 @@ mod tests {
         assert_eq!(u.kind, "number");
         assert!(u.must_confirm, "数值必须人工确认");
         assert_eq!(p.notes.len(), 1);
+    }
+
+    #[test]
+    fn per_cell_confidence_takes_the_lower_of_model_and_rules() {
+        let answer = serde_json::json!({
+            "rows": [
+                // 模型自报 0.4（规则给 0.9）→ 取 0.4，来源 model
+                {"obs_id": "OB-1", "sample_id": "S-1", "value_num": "62.3",
+                 "confidence": {"value_num": 0.4}},
+                // 模型没报 → 只看规则：数字格式对 → 0.9
+                {"obs_id": "OB-2", "sample_id": "S-1", "value_num": "33.3"},
+                // 模型自报很高，但值里有"可能"→ 规则 0.4 更低，取规则
+                {"obs_id": "OB-3", "sample_id": "S-1", "value_num": "可能是64",
+                 "confidence": {"value_num": 0.99}},
+            ]
+        });
+        let p = parse_answer(&answer, &fields()).unwrap();
+        assert_eq!(p.confidence.len(), 3);
+        let c0 = &p.confidence[0]["value_num"];
+        assert!((c0.score - 0.4).abs() < 0.001 && c0.source == "model", "{c0:?}");
+        let c1 = &p.confidence[1]["value_num"];
+        assert!((c1.score - 0.9).abs() < 0.001 && c1.source == "heuristic", "{c1:?}");
+        let c2 = &p.confidence[2]["value_num"];
+        assert!(
+            (c2.score - 0.3).abs() < 0.001,
+            "看不清是不是数字 → 0.3（比模型的 0.99 更保守）：{c2:?}"
+        );
+
+        // 低置信度清单：上面三个 value_num 都低于 0.7（0.4 / 0.9 / 0.3）→ 只有 0.4 与 0.3 两个
+        let low = low_confidence_cells(&p.rows, &p.confidence, LOW_CONFIDENCE);
+        assert_eq!(low.len(), 2, "{low:?}");
+        assert!(low.iter().all(|u| u.kind == "low_confidence"));
+        assert!(low[0].reason.contains("置信度"), "{}", low[0].reason);
+    }
+
+    #[test]
+    fn confidence_json_is_machine_readable() {
+        let answer = serde_json::json!({
+            "rows": [{"obs_id": "OB-1", "sample_id": "S-1", "value_num": "1.5"}]
+        });
+        let p = parse_answer(&answer, &fields()).unwrap();
+        let v = confidence_json(&p.rows, &p.confidence);
+        assert_eq!(v["format"], "cercis-scribe-confidence/1");
+        assert_eq!(v["rows"][0]["index"], 1);
+        assert_eq!(v["rows"][0]["cells"]["value_num"]["value"], "1.5");
+        assert!(v["rows"][0]["cells"]["value_num"]["score"].as_f64().unwrap() > 0.5);
     }
 
     #[test]

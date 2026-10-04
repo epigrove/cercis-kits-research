@@ -203,7 +203,8 @@ fn s9_scribe_flow() {
     .unwrap();
     let answer = serde_json::json!({
         "rows": [
-            {"obs_id": "OB-0001", "sample_id": "S-001", "trait_id": "plant_height_cm", "value_num": "62.3", "unit": "cm", "measured_at": "2026-06-15"},
+            {"obs_id": "OB-0001", "sample_id": "S-001", "trait_id": "plant_height_cm", "value_num": "62.3", "unit": "cm", "measured_at": "2026-06-15",
+             "confidence": {"value_num": 0.55, "sample_id": {"score": 0.95, "reason": "屏幕上的编号看得很清"}}},
             {"obs_id": "OB-0002", "sample_id": "S-001", "trait_id": "spad", "value_num": "33.3", "unit": "SPAD", "measured_at": "2026-06-15"},
             {"obs_id": "OB-0003", "sample_id": "S-002", "trait_id": "plant_height_cm", "value_num": "", "measured_at": "2026-06-16", "remark": "多出来的键"}
         ],
@@ -250,9 +251,36 @@ fn s9_scribe_flow() {
         "fields.json",
         "待确认.md",
         "observations.draft.csv",
+        "observations.confidence.json",
     ] {
         assert!(sdir.join(f).is_file(), "会话目录缺 {f}");
     }
+
+    // 逐格置信度：每个格子都有分数，且低分的会在复核里点名
+    let conf: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(sdir.join("observations.confidence.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(conf["format"], "cercis-scribe-confidence/1");
+    let first_cells = conf["rows"][0]["cells"].as_object().unwrap();
+    assert!(
+        first_cells.values().all(|c| {
+            let s = c["score"].as_f64().unwrap_or(-1.0);
+            (0.0..=1.0).contains(&s)
+        }),
+        "分数必须在 0–1：{conf}"
+    );
+    let low_in_conf = conf["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|r| r["cells"].as_object().unwrap().values())
+        .filter(|c| c["score"].as_f64().unwrap_or(1.0) < 0.7)
+        .count();
+    assert!(
+        low_in_conf >= 1,
+        "夹具里有听不清的格子，应该至少有一个低分：{conf}"
+    );
 
     // 3. 确认前主表零变化
     let before = kernel_json(&kernel, &["query", &p, "--table", "observations", "--json"]);
@@ -273,6 +301,10 @@ fn s9_scribe_flow() {
     assert!(
         out["must_confirm"].as_u64().unwrap_or(0) >= 1,
         "数值项必须要求确认：{out}"
+    );
+    assert!(
+        out["low_confidence"].as_u64().unwrap_or(0) >= 1,
+        "低置信度格子要在复核里点名：{out}"
     );
 
     // 5. 没确认不让入库
