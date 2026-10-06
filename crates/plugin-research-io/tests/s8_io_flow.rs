@@ -3,8 +3,8 @@
 //! 路线：建项目 → 装田间试验模板 → 导入前置表（研究/事件/样本）→
 //! **导入 Excel 手写记录表** → 生成数据说明书 → 导出 SPSS → 导出 R（含宽表）。
 //!
-//! 数据全部为合成数据；夹具 `fixtures/手写记录表.xlsx` 是脚本生成的空白记录表样例
-//! （结构与模板的"观测"表对得上，另有两列故意多出来，用来验证列映射的拦截）。
+//! 数据全部为合成数据；Excel 夹具**在测试运行时生成**（仓库里不放二进制：
+//! 发布守卫对 .xlsx 一律按"可能是真实数据"处理，运行时生成就不必开例外）。
 //!
 //! 二进制没构建时跳过并说明原因，不假装通过。
 
@@ -40,6 +40,143 @@ fn plugin_bin(name: &str) -> Option<PathBuf> {
 fn skip(reason: &str) -> bool {
     eprintln!("跳过：{reason}");
     true
+}
+
+/// 写一个最小可读的 .xlsx（zip + 内联字符串）。
+///
+/// 仓库里不放二进制夹具：`cercis guard` 对 `.xlsx` 一律按"可能是真实记录"拒绝，
+/// 而测试只需要"一个能被 calamine 读到的表"，运行时造出来最干净。
+fn write_minimal_xlsx(path: &Path, rows: &[Vec<&str>]) {
+    let mut sheet = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
+         <worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>",
+    );
+    for (r, row) in rows.iter().enumerate() {
+        sheet.push_str(&format!("<row r=\"{}\">", r + 1));
+        for (c, cell) in row.iter().enumerate() {
+            let col = (b'A' + c as u8) as char;
+            sheet.push_str(&format!(
+                "<c r=\"{col}{}\" t=\"inlineStr\"><is><t>{}</t></is></c>",
+                r + 1,
+                xml_escape(cell)
+            ));
+        }
+        sheet.push_str("</row>");
+    }
+    sheet.push_str("</sheetData></worksheet>");
+
+    let parts: Vec<(&str, String)> = vec![
+        (
+            "[Content_Types].xml",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
+             <Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\
+             <Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>\
+             <Default Extension=\"xml\" ContentType=\"application/xml\"/>\
+             <Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>\
+             <Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>\
+             </Types>"
+                .to_string(),
+        ),
+        (
+            "_rels/.rels",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
+             <Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\
+             <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>\
+             </Relationships>"
+                .to_string(),
+        ),
+        (
+            "xl/_rels/workbook.xml.rels",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
+             <Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\
+             <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>\
+             </Relationships>"
+                .to_string(),
+        ),
+        (
+            "xl/workbook.xml",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
+             <workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" \
+             xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\
+             <sheets><sheet name=\"观测记录\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>"
+                .to_string(),
+        ),
+        ("xl/worksheets/sheet1.xml", sheet),
+    ];
+    std::fs::write(path, zip_stored(&parts)).expect("写 xlsx 夹具");
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+/// 最简 zip（只用 stored，不压缩）：局部头 + 数据 + 中央目录 + 结束记录。
+fn zip_stored(parts: &[(&str, String)]) -> Vec<u8> {
+    let mut out: Vec<u8> = Vec::new();
+    let mut central: Vec<u8> = Vec::new();
+    for (name, body) in parts {
+        let data = body.as_bytes();
+        let crc = crc32(data);
+        let offset = out.len() as u32;
+        // 局部文件头
+        out.extend_from_slice(&0x0403_4b50u32.to_le_bytes());
+        out.extend_from_slice(&20u16.to_le_bytes()); // version
+        out.extend_from_slice(&0u16.to_le_bytes()); // flags
+        out.extend_from_slice(&0u16.to_le_bytes()); // stored
+        out.extend_from_slice(&0u16.to_le_bytes()); // time
+        out.extend_from_slice(&0u16.to_le_bytes()); // date
+        out.extend_from_slice(&crc.to_le_bytes());
+        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(name.len() as u16).to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes()); // extra
+        out.extend_from_slice(name.as_bytes());
+        out.extend_from_slice(data);
+        // 中央目录项
+        central.extend_from_slice(&0x0201_4b50u32.to_le_bytes());
+        central.extend_from_slice(&20u16.to_le_bytes());
+        central.extend_from_slice(&20u16.to_le_bytes());
+        central.extend_from_slice(&0u16.to_le_bytes());
+        central.extend_from_slice(&0u16.to_le_bytes());
+        central.extend_from_slice(&0u16.to_le_bytes());
+        central.extend_from_slice(&0u16.to_le_bytes());
+        central.extend_from_slice(&crc.to_le_bytes());
+        central.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        central.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        central.extend_from_slice(&(name.len() as u16).to_le_bytes());
+        central.extend_from_slice(&0u16.to_le_bytes()); // extra
+        central.extend_from_slice(&0u16.to_le_bytes()); // comment
+        central.extend_from_slice(&0u16.to_le_bytes()); // disk
+        central.extend_from_slice(&0u16.to_le_bytes()); // attrs
+        central.extend_from_slice(&0u32.to_le_bytes()); // external attrs
+        central.extend_from_slice(&offset.to_le_bytes());
+        central.extend_from_slice(name.as_bytes());
+    }
+    let central_offset = out.len() as u32;
+    let central_size = central.len() as u32;
+    out.extend_from_slice(&central);
+    // 结束记录
+    out.extend_from_slice(&0x0605_4b50u32.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes()); // disk
+    out.extend_from_slice(&0u16.to_le_bytes()); // disk with cd
+    out.extend_from_slice(&(parts.len() as u16).to_le_bytes());
+    out.extend_from_slice(&(parts.len() as u16).to_le_bytes());
+    out.extend_from_slice(&central_size.to_le_bytes());
+    out.extend_from_slice(&central_offset.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes()); // comment len
+    out
+}
+
+fn crc32(data: &[u8]) -> u32 {
+    let mut crc = 0xFFFF_FFFFu32;
+    for &b in data {
+        crc ^= b as u32;
+        for _ in 0..8 {
+            let mask = (crc & 1).wrapping_neg();
+            crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+        }
+    }
+    !crc
 }
 
 fn tmp(name: &str) -> PathBuf {
@@ -166,8 +303,14 @@ fn s8_import_codebook_and_exports() {
     }
 
     // 1a. 手写表没有记录编号：应提示用 --generate-id 自动生成
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/手写记录表.xlsx");
-    assert!(fixture.is_file(), "缺少夹具：{}", fixture.display());
+    // 夹具在**运行时生成**（仓库里不放二进制：发布守卫对 .xlsx 一律按"可能是真实数据"处理）
+    let fixture = dir.join("手写记录表.xlsx");
+    write_minimal_xlsx(&fixture, &[
+        vec!["关联样本", "指标编号", "测定值", "计量单位", "测定日期", "天气", "手写备注"],
+        vec!["S-001", "plant_height_cm", "62.3", "cm", "2026-06-15", "晴", ""],
+        vec!["S-001", "spad", "33.3", "SPAD", "2026-06-15", "晴", "叶片有点黄"],
+        vec!["S-002", "plant_height_cm", "64", "cm", "2026-06-16", "阴", "有虫斑"],
+    ]);
     let (code, out) = plugin(
         &io,
         &kernel,
